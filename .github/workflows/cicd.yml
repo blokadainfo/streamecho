@@ -59,4 +59,7 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: |-
             linux/amd64
-            linux/arm64
+          # TODO: Figure out why arm64 breaks
+          # platforms: |-
+          #   linux/amd64
+          #   linux/arm64
