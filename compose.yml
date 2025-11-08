@@ -1,0 +1,9 @@
+services:
+  streamecho:
+    image: ghcr.io/blokadainfo/streamecho:latest
+    environment:
+      MUMBLE_ADDRESS: "my.mumble.host:64738"
+      MUMBLE_USERNAME: "StreamEcho"
+      MUMBLE_PASSWORD: "password"
+      STREAM_URL: "rtmp://example.com/live"
+    restart: unless-stopped
