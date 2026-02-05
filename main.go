@@ -10,6 +10,7 @@ import (
 
 	"layeh.com/gumble/gumble"
 	"layeh.com/gumble/gumbleffmpeg"
+	"layeh.com/gumble/gumbleutil"
 	_ "layeh.com/gumble/opus"
 )
 
@@ -17,6 +18,7 @@ type Config struct {
 	MumbleAddress  string
 	MumbleUsername string
 	MumblePassword string
+	MumbleChannel  string
 	StreamUrl      string
 }
 
@@ -38,6 +40,12 @@ func LoadConfig() Config {
 		mp = ""
 	}
 
+	mc, mcP := os.LookupEnv("MUMBLE_CHANNEL")
+	if !mcP {
+		slog.Warn("MUMBLE_CHANNEL is empty, using default root channel")
+		mc = ""
+	}
+
 	su, suP := os.LookupEnv("STREAM_URL")
 	if !suP {
 		log.Fatal("STREAM_URL env var must be set")
@@ -47,6 +55,7 @@ func LoadConfig() Config {
 		MumbleAddress:  ma,
 		MumbleUsername: mu,
 		MumblePassword: mp,
+		MumbleChannel:  mc,
 		StreamUrl:      su,
 	}
 }
@@ -84,5 +93,27 @@ func main() {
 	gc := gumble.NewConfig()
 	gc.Username = c.MumbleUsername
 	gc.Password = c.MumblePassword
+	gc.Attach(&gumbleutil.Listener{
+		Connect: func(e *gumble.ConnectEvent) {
+			if c.MumbleChannel == "" {
+				slog.Info("Joined default channel")
+				return
+			}
+
+			ch := e.Client.Channels.Find(c.MumbleChannel)
+			if ch == nil {
+				slog.Warn("Channel not found", "name", c.MumbleChannel)
+				return
+			}
+			e.Client.Self.Move(ch)
+			slog.Info("Joined channel", "name", ch.Name)
+		},
+	})
+	gc.Attach(&gumbleutil.Listener{
+		Disconnect: func(e *gumble.DisconnectEvent) {
+			slog.Error("Disconnected from the server, exiting...")
+			os.Exit(1)
+		},
+	})
 	Connect(gc, c.MumbleAddress, c.StreamUrl)
 }
