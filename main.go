@@ -21,7 +21,8 @@ type Config struct {
 	MumblePassword    string
 	MumbleChannel     string
 	MumbleChannelLock bool
-	StreamUrl         string
+	Source            string
+	Delay             time.Duration
 }
 
 func LoadConfig() Config {
@@ -32,19 +33,19 @@ func LoadConfig() Config {
 
 	mu, muP := os.LookupEnv("MUMBLE_USERNAME")
 	if !muP {
-		slog.Warn("MUMBLE_USERNAME is empty, using default StreamEcho username")
+		slog.Warn("MUMBLE_USERNAME is empty, defaulting to StreamEcho username")
 		mu = "StreamEcho"
 	}
 
 	mp, mpP := os.LookupEnv("MUMBLE_PASSWORD")
 	if !mpP {
-		slog.Warn("MUMBLE_PASSWORD is empty, using default empty password")
+		slog.Warn("MUMBLE_PASSWORD is empty, defaulting to empty password")
 		mp = ""
 	}
 
 	mc, mcP := os.LookupEnv("MUMBLE_CHANNEL")
 	if !mcP {
-		slog.Warn("MUMBLE_CHANNEL is empty, using default root channel")
+		slog.Warn("MUMBLE_CHANNEL is empty, defaulting to root channel")
 		mc = ""
 	}
 
@@ -58,9 +59,19 @@ func LoadConfig() Config {
 		log.Fatal("MUMBLE_CHANNEL_LOCK must be a boolean")
 	}
 
-	su, suP := os.LookupEnv("STREAM_URL")
-	if !suP {
-		log.Fatal("STREAM_URL env var must be set")
+	s, sP := os.LookupEnv("SOURCE")
+	if !sP {
+		log.Fatal("SOURCE env var must be set")
+	}
+
+	d, dP := os.LookupEnv("DELAY_SECONDS")
+	if !dP {
+		slog.Warn("DELAY_SECONDS is not set, defaulting to 5 seconds")
+		d = "5"
+	}
+	dV, err := strconv.Atoi(d)
+	if err != nil {
+		log.Fatal("DELAY_SECONDS must be a number")
 	}
 
 	return Config{
@@ -69,11 +80,12 @@ func LoadConfig() Config {
 		MumblePassword:    mp,
 		MumbleChannel:     mc,
 		MumbleChannelLock: mclV,
-		StreamUrl:         su,
+		Source:            s,
+		Delay:             time.Duration(dV) * time.Second,
 	}
 }
 
-func Connect(c *gumble.Config, addr string, streamUrl string) {
+func Connect(c *gumble.Config, addr string, source string, delay time.Duration) {
 	client, err := GumbleDialInsecure(addr, c)
 	if err != nil {
 		log.Fatal(err)
@@ -81,16 +93,16 @@ func Connect(c *gumble.Config, addr string, streamUrl string) {
 	slog.Info("Connected to the Mumble server", "address", addr, "username", c.Username)
 
 	for {
-		source := gumbleffmpeg.SourceFile(streamUrl)
+		source := gumbleffmpeg.SourceFile(source)
 		stream := gumbleffmpeg.New(client, source)
 
 		if err := stream.Play(); err != nil {
-			slog.Error("Failed playing the stream", "error", err)
+			slog.Error("Failed playing the source", "error", err)
 		}
 
 		stream.Wait()
-		slog.Warn("Stream stopped, reconnecting in 5 seconds...")
-		time.Sleep(5 * time.Second)
+		slog.Debug("Playback stopped, restarting...")
+		time.Sleep(delay)
 	}
 }
 
@@ -138,5 +150,5 @@ func main() {
 			os.Exit(1)
 		},
 	})
-	Connect(gc, c.MumbleAddress, c.StreamUrl)
+	Connect(gc, c.MumbleAddress, c.Source, c.Delay)
 }
