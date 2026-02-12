@@ -4,5 +4,8 @@ podman run \
   -e MUMBLE_ADDRESS="my.mumble.host:64738" \
   -e MUMBLE_USERNAME="StreamEcho" \
   -e MUMBLE_PASSWORD="password" \
-  -e STREAM_URL="rtmp://example.com/live" \
+  -e MUMBLE_CHANNEL="" \
+  -e MUMBLE_CHANNEL_LOCK="false" \
+  -e SOURCE="rtmp://example.com/live" \
+  -e DELAY_SECONDS="5" \
   streamecho-dev
